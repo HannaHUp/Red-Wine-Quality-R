@@ -1,0 +1,442 @@
+---
+title: "winered"
+output: html_document
+---
+
+## Which chemical properties influence the quality of red wines?
+Let's run some basic functions to examine the structure and schema of the data set.
+```{r}
+
+getwd()
+setwd('~/Downloads')
+winered<-read.csv('wineQualityReds.csv')
+str(winered)
+```
+
+Our dataset consists of 13 variables, with almost 1599 observations. We can delete X column since it appears to be the unique identifier.
+
+```{r}
+winered<-subset(winered,select = -X)
+head(winered,10)
+```
+
+
+
+```{r}
+summary(winered)
+```
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+library(gridExtra)
+library(ggplot2)
+create_plot <- function(varname, binwidth = 0.1) {
+  return(ggplot(aes_string(x = varname), data = winered) + 
+           geom_histogram(binwidth = binwidth))
+}
+q1<-create_plot('fixed.acidity')
+q2<-create_plot('volatile.acidity')
+q3<-ggplot(aes(x = citric.acid), data = winered) + 
+  geom_histogram(binwidth = 0.03)
+q4<-create_plot('residual.sugar')
+q5<-ggplot(aes(x = chlorides), data = winered) + 
+  geom_histogram(binwidth = 0.004)
+q6<-ggplot(aes(x = free.sulfur.dioxide), data = winered) + 
+  geom_histogram(binwidth = 5)
+q7<-ggplot(aes(x = total.sulfur.dioxide), data = winered) + 
+  geom_histogram(binwidth = 5)+
+  xlim(0,200)
+q8<-ggplot(aes(x = density), data = winered) + geom_histogram(binwidth = 0.001)
+
+q9<-create_plot('pH')
+q10<-create_plot('sulphates')
+q11<-create_plot('alcohol')
+q12<-ggplot(aes(x = quality), data = winered) + geom_bar()
+grid.arrange(q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,q12,ncol=4)
+```
+
+fixed.acidity
+volatile.acidity 
+citric.acid 
+residual.sugar 
+chlorides 
+free.sulfur.dioxide 
+total.sulfur.dioxide
+sulphates
+and alcohol
+seem to be long-tailed.
+
+
+It appears that density and pH are normally distributed, with few outliers.
+
+
+
+## 探索变量之间的相关性
+
+```{r}
+library("GGally")
+ggcorr(winered, hjust = 1, size = 3, color = "grey50", layout.exp = 2, 
+       label = TRUE, label_size = 3, label_round = 2, label_alpha = TRUE)
+```
+
+#
+当相关性大于0.3或者小于-0.3时，我们认为具有相关性。
+从上图可以清晰的看出，正相关的比较大的具有 fixed.acidity和citric.acid
+相关性为0.67，fixed.acidity和density相关性0.67
+free.sulfur.dioxide 和 total.sulfur.dioxide 相关性为0.67
+citric.acid 和density为0.36 
+citric.acid 和 sulphates为0.31
+residual.sugar和density为0.36 
+chlorides和 sulphates为0.37
+alcohol和quality为0.48
+
+负相关性比较大的为：
+fixed.acidity和PH，相关性为-0.68
+citric.acid 和PH为-0.54
+density和ph为-0.34
+volatile.acidity 和quality 相关性为-0.39
+volatile.acidity与citric.acid 为-0.55
+总结：
+alcohol和quality为0.48 以及volatile.acidity 和quality 相关性为-0.39
+而其中alcohol与其他变量的相关性不大，volatile.acidity与citric.acid 为-0.55
+因此其实与quality有正相关的有alcohol，citric.acid，负相关的有volatile.acidity
+
+##一个一个的将变量与变量作图，从图验证相关性
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+library(ggplot2)
+library(ggthemes)
+s1<-ggplot(winered) + geom_point(aes(x = free.sulfur.dioxide, 
+                y=total.sulfur.dioxide), 
+                size = 2, shape = 5,alpha=0.5) +
+   theme_bw()+ggtitle('Figure 1')
+
+s2<-ggplot(winered) + geom_point(aes(x = citric.acid, 
+                                     y=density), size = 2, 
+                                 shape = 5,alpha=0.5) + 
+   theme_bw()+ggtitle('Figure 2')
+
+grid.arrange(s1,s2,ncol=2)
+```
+
+
+每一张图大致都能反应出相关性，图片里面的数据都有右倾的显现,
+例如图一的free.sulfur.dioxide 和 total.sulfur.dioxide，其相关性为0.67； 
+但是可能因为相关性太小了，有些图的相关性并不明显，例如图二的citric.acid 和density.
+
+
+
+```{r}
+s3<-ggplot(winered) + geom_point(aes(x = citric.acid, y=sulphates), 
+                                 size = 2, shape = 5,alpha=0.5) + 
+   theme_bw()+ggtitle('Figure 3')
+
+s4<-ggplot(winered) + geom_point(aes(x = residual.sugar, y=density), size = 2,
+                                 shape = 5,alpha=0.5) + 
+   theme_bw()+ggtitle('Figure 4')
+grid.arrange(s3,s4,ncol=2)
+```
+
+有明显关系的是图四的residual.sugar和density，其相关性为0.36，
+而图三的citric.acid 和 sulphates 从图上看不出多大的相关性。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+s5<-ggplot(winered) + geom_point(aes(x = chlorides, y=sulphates), size = 2, 
+                                 shape = 5,alpha=0.5) + 
+   theme_bw()+ggtitle('Figure 5')
+
+s6<-ggplot(winered) + geom_point(aes(x = fixed.acidity, y=citric.acid), 
+                                 size = 2, shape = 5,alpha=0.5) + 
+  theme_bw()+ggtitle('Figure 6')
+
+s7<-ggplot(winered) + geom_point(aes(x = fixed.acidity, y=density), size = 2, 
+                                 shape = 5,alpha=0.5) + 
+   theme_bw()+ggtitle('Figure 7')
+
+
+grid.arrange(s5,s6,s7,ncol=2)
+```
+
+这三幅图都具有明显的关系：
+图五的chlorides和 sulphates为0.37，图六fixed.acidity和citric.acid，相关性为0.67，
+图7️fixed.acidity和density相关性0.67。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+
+s8<-ggplot(winered,aes(x=factor(quality),y=alcohol)) + geom_boxplot()+
+  ylab('alcohol') + 
+  ggtitle('Figure 8')  
+
+s8
+```
+
+
+图八alcohol和quality为0.48,可以明显看出alcohol的中位数随着quality的上升而上升，
+每一个质量的25%-75&之间的alcohol数在大方向上也是上升的，可以这么理解为，
+在大方向上，不同质量的红酒里的alcohol数是不同的。
+
+
+
+##下面是负相关的双变量图
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+p1<-ggplot(winered, aes (x=fixed.acidity, y=pH,colour='Red')) + 
+  geom_point(size=1,show.legend=FALSE) +geom_smooth(color = 'darkred') + 
+  theme_bw()
+
+p2<-ggplot(winered, aes (x=citric.acid, y=pH,colour='Red')) + 
+  geom_point(size=1,show.legend=FALSE) +geom_smooth(color = 'darkred') + 
+  theme_bw()
+#在这里加了颜色因为黑色实在太丑了
+
+grid.arrange(p1,p2,ncol=2)
+```
+
+从图可以看出，fixed.acidity vs pH，citric.acid vs pH的图中，ph高的值都在左上角，
+而ph低都在右下角，可以看出来确实是负相关的
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+p3<-ggplot(winered, aes (x=density, y=pH,colour='Red')) + 
+  geom_point(size=1,show.legend=FALSE) +
+  geom_smooth(color = 'darkred') + theme_bw()
+
+p4<-ggplot(winered, aes (x=volatile.acidity, y=citric.acid,colour='Red')) + 
+  geom_point(size=1,show.legend=FALSE) +geom_smooth(color = 'darkred') +
+  theme_bw()
+grid.arrange(p3,p4,ncol=2)
+```
+从density vs pH的图中，比较难从图形中看出关系，但是从拟合线可以看出是负相关，
+而volatile.acidity vs quality，quality越高的都在左上角，低的在右下角，确实是负相关
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+p5<-ggplot(winered, aes (x=factor(quality), y=volatile.acidity,colour='Red')) + 
+  geom_boxplot(show.legend=FALSE) + theme_bw()
+p5
+```
+
+这幅箱线图非常明显的表明了quality和volatile.acidity是负相关：
+从最大值来看，除了第4级别的quality，其他quality的最大值随着质量的增加而减少；
+从中位线来看，随着quality的质量的增加而减少；
+从最小值看，大方向上也是随着quality的质量的增加而减少。
+
+此部分结论：quality与alcohol呈正向关系。
+
+##以下将制出具有相关性的两个变量分别与quality的关系图
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+
+library("ggthemes")
+create_plot <- function(xvarname,yvarname,quality=winered$quality) {
+  return(ggplot(data = winered, aes_string (x = xvarname,y=yvarname,
+                                            color = factor(quality))) + 
+           geom_jitter(size = 1) + 
+           scale_color_brewer(type='seq', 
+                              guide=guide_legend(title='quality levels')) +
+           geom_smooth(color = '#FF6633',method = 'lm') + 
+           theme_bw())}
+
+m1<-create_plot('free.sulfur.dioxide', 
+               'total.sulfur.dioxide')
+m1<-m1+ggtitle('Figure 1')
+
+m1
+```
+
+此图第一眼看上去似乎两变量具有正相关性，但是从quality的角度看，即从散点图的颜色可以发现，深色和浅色的点分布均匀，并没有特殊的倾向，因此可以得出结论，quality与free.sulfur.dioxide和total.sulfur.dioxide的关系不大。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m2<-create_plot('citric.acid', 
+               'density')
+m2<- m2+ggtitle('Figure 2')
+m2
+```
+
+从散点图的颜色可以发现，似乎深色的点大部分分布在下方偏右，浅色的点分布在上方偏左，但是仔细一看，深浅色的点仍然是比较均匀的分布的，深色的点存在在citric.acid和density的值小以及大的地方 因此可以得出结论，quality与citric.acid和density的关系并不是很大。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m3<-create_plot('citric.acid', 
+               'sulphates')
+m3<-m3+ggtitle('Figure 3')
+m3
+
+```
+从散点图的颜色可以发现，似乎深色的点大部分与浅色的点混合分布在一起，仔细一看，深浅色的点水平分布，小的大的citric.acid的地方都有高质量的点存在，在竖直方向上，大部分深色的点在下方，小部分在上方，但这并不能是说明是负相关性，因为在上面浅色的点太少了。 因此可以得出结论，quality与citric.acid和sulphates的关系并不是很大。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m4<-create_plot('residual.sugar', 
+               'density')
+m4<-m4+ggtitle('Figure 4')
+m4
+```
+
+从散点图的颜色可以发现，似乎深色的点大部分与浅色的点混合分布在一起，仔细一看，深浅色的点水平分布，小的大的citric.acid的地方都有高质量的点存在，在竖直方向上也是， 因此可以得出结论，quality与residual.sugar，density的关系并不是很大。
+
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m5<-create_plot('chlorides', 
+               'sulphates')
+m5<-m5+ggtitle('Figure 5')
+m5
+
+```
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m6<-create_plot('fixed.acidity',
+                'pH')
+m6<-m6+ggtitle('Figure 6')
+m6
+```
+
+深色的点均匀分布，无法得知其相关性。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m7<-create_plot('citric.acid',
+                'pH')
+m7<-m7+ggtitle('Figure 7')
+m7
+```
+
+深色的点均匀分布，无法得知其相关性。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+
+m8<-create_plot('density',
+                 'pH')
+m8<-m8+ggtitle('Figure 8')
+m8
+```
+
+深色的点均匀分布，无法得知其相关性。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+
+m9<-create_plot('citric.acid',
+                'fixed.acidity')
+m9<-m9+ggtitle('Figure 9')
+m9
+
+```
+
+深色的点均匀分布，无法得知其相关性。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m10<-create_plot('density',
+                 'fixed.acidity')
+m10<-m10+ggtitle('Figure 10')
+m10
+
+```
+
+深色的点均匀分布，无法得知其相关性。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+m11<-create_plot('volatile.acidity',
+                 'citric.acid')
+m11<-m11+ggtitle('Figure 11')
+m11
+```
+
+此图可以明显的看出，深色的点大多在左方，而右边比较多浅色的点，但是在竖直方向上，深色的点上下分布都比较多，
+因此，quality与volatile.acidity呈现反向关系。
+
+此部分结论：quality与volatile.acidity呈现反向关系。
+
+探索数据的结论：quality与volatile.acidity呈现反向关系，quality与alcohol呈正向关系。
+
+##最终图
+
+第一幅图，首先表达了不同变量之间相关性。
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+library(corrplot)
+corrplot.mixed(cor(winered), lower="number", upper="pie", order ="AOE",
+               tl.col="darkblue", tl.cex=0.5)
+
+
+```
+
+
+结论：alcohol和quality为0.48 以及volatile.acidity 和quality 相关性为-0.39
+而其中alcohol与其他变量的相关性不大，volatile.acidity与citric.acid 为-0.55
+citric.acid影响着volatile.acidity，因此其实可能间接影响quality，但是从前面图中可以看到，影响甚微。
+因此其实与quality有正相关的有alcohol，负相关的有volatile.acidity
+
+
+第二幅图具体的表现了与quality的相关性最大的几个变量。
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+ggplot(winered, aes(x=citric.acid, y = volatile.acidity, 
+                    color = factor(quality))) + geom_jitter(shape=10, 
+                                                            size = 2)+ 
+  geom_smooth(method = 'lm') + 
+  scale_color_brewer(type='seq', guide=guide_legend(title='Quality')) + 
+  ggtitle('the relationship of quality with alcohol and volatile.acidity') + 
+  theme_bw()
+
+```
+
+
+从本图可以看到quality越高的在越下面，说明volatile.acidity越低，质量越高。
+然而在水平上的分布比较均匀。
+
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+
+ggplot(winered, aes(x=alcohol, y = volatile.acidity, color = factor(quality))) + 
+  geom_jitter(shape=10, size = 2)  + geom_smooth(method = 'lm') + 
+  scale_color_brewer(type='seq', guide=guide_legend(title='Quality')) + 
+  ggtitle('the relationship of quality with alcohol and volatile.acidity') + 
+  theme_bw()
+```
+
+从本图可以看到quality越高的在越下面，说明volatile.acidity越低，质量越高。
+水平上的，alcohol越大，质量可能越高，例如在alcohol11左右有一个分界。
+可以理解为，quality其实是与这两个因素都相关的。
+
+
+第三幅图分别画了变量的中位数与quality的关系
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+library('dplyr')
+meanset<-winered%>%
+  group_by(quality)%>%
+  summarise(mean_alcohol=mean(alcohol),
+            mean_volatile.acidity=mean(volatile.acidity),
+            n=n())%>%
+  arrange(quality)
+
+g1<-ggplot(meanset,aes(x=quality,y=mean_alcohol))+geom_line()+ 
+  ggtitle('mean_alcohol vs quality') 
+
+g2<-ggplot(meanset,aes(x=quality,y=mean_volatile.acidity))+geom_line()+ 
+  ggtitle('mean_volatile.acidity vs quality') 
+
+
+
+grid.arrange(g1,g2,ncol=2)
+
+```
+
+此图是考虑了中位数与quality的关系。
+我们必须要结合前面的分析，前面探索数据部分的结论：quality与volatile.acidity呈现反向关系，quality与alcohol呈正向关系。
+而这里的两幅图可以看出：alcohol在3-4这部分和5-8这部分是与quality成正向关系，而4-5部分是呈方向关系。
+volatile.acidity 在3-7这部分与quality呈反向关系，从大方向看，alcohol与quality成正向关系，而quality与volatile.acidity呈反向关系。
+
+
+``
+
+
+
+
+
+##反思
+
+按照一般思路来说首先是大概了解数据，然后在本项目应该一一作图，查看其关系，算出相关性，一般来说
+相关性>0.3,或者相关性<-0.3才具有相关性，而本项目只有volatile.acidit与quality的相关性满足这两个范围。
+遇到的最大的问题是：在做这个项目的过程中，脑袋卡壳了，然后在审阅者的提示下，又有思路了。
+对该项目的建议：由于alcohol是正相关性最大的一个变量，那么可以考虑适当增加其alcohol的量，或者说研制出对人体有好处味道与酒精差不多的新原料。
+volatile.acidit与quality是负相关性，可以考虑稍微降低volatile.acidit。
+
+
+
+``查看的相关网址
+https://wenku.baidu.com/view/5c3d1e0068eae009581b6bd97f1922791688be28.html
+http://www.360doc.com/content/16/0703/00/3852985_572542419.shtml
+https://baijiahao.baidu.com/s?id=1576699211067823610&wfr=spider&for=pc
+https://www.wenji8.com/p/139qu99.html
+```
+
+
+
